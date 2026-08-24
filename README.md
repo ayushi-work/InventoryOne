@@ -14,8 +14,8 @@ The project will be developed using the **Agile methodology**, with development 
 
 | Member           | Role               | Responsibilities                                                     |
 | ---------------- | ------------------ | -------------------------------------------------------------------- |
-| **Avni**         | Scrum Master & Frontend Developer | Sprint planning, coordination, task tracking, and user interface development |
-| **Ayushi**       | Backend Developer & Tester       | Backend, database, APIs, testing, and bug fixing                     |
+| **Avni**         | TBD | TBD |
+| **Ayushi**       | TBD       | TBD                     |
 
 ---
 
