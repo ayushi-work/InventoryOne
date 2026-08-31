@@ -21,7 +21,22 @@ The project will be developed using the **Agile methodology**, with development 
 
 ## Technologies
 
-*The technology stack is yet to be finalised — this section will be updated after discussion.*
+| Layer              | Technology                           |
+| ------------------ | ------------------------------------ |
+| Frontend           | Next.js + TypeScript                 |
+| Backend            | Django + Django REST Framework       |
+| Database           | PostgreSQL                           |
+| ORM                | Django ORM                           |
+| Real-time          | Django Channels + Redis              |
+| Authentication     | Firebase Auth / Django authentication |
+| File storage       | AWS S3                               |
+| Notifications      | Firebase Cloud Messaging             |
+| Maps               | Google Maps API                      |
+| Payments           | TBD                                  |
+| Background jobs    | Celery + Redis                       |
+| Admin              | Django Admin                         |
+| Deployment         | AWS / Render / Railway               |
+| CI/CD              | GitHub Actions                       |
 
 ---
 
@@ -67,7 +82,7 @@ InventoryOne/
 | Code Repository            | GitHub                |
 | Project Management         | GitHub Projects       |
 | API Testing                | Postman               |
-| Database                   | MySQL                 |
+| Database                   | PostgreSQL            |
 | Testing                    | PyTest / JUnit        |
 | Documentation              | Markdown              |
 

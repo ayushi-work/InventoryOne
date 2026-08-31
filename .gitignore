@@ -21,5 +21,17 @@ dist/
 build/
 target/
 
+# Next.js (src/frontend)
+src/frontend/.next/
+src/frontend/out/
+src/frontend/*.tsbuildinfo
+src/frontend/.env*.local
+
+# Django (src/backend)
+src/backend/staticfiles/
+src/backend/media/
+src/backend/db.sqlite3
+src/backend/.env
+
 # Logs
 *.log
