@@ -15,8 +15,14 @@ from rest_framework.response import Response
 from .models import (
     Broker,
     OTPCode,
+    Plot,
+    Project,
 )
-from .serializers import BrokerSerializer
+from .serializers import (
+    BrokerSerializer,
+    ProjectDetailSerializer,
+    ProjectListSerializer,
+)
 
 TDS_PCT = Decimal(10)
 
@@ -96,5 +102,33 @@ def me(request):
     serializer.is_valid(raise_exception=True)
     serializer.save()
     return Response(serializer.data)
+
+
+# ---------------------------------------------------------------------------
+# Projects & inventory
+# ---------------------------------------------------------------------------
+
+def annotated_projects():
+    return Project.objects.annotate(
+        total_plots=Count('plots'),
+        available=Count('plots', filter=Q(plots__status=Plot.STATUS_AVAILABLE)),
+        on_hold=Count('plots', filter=Q(plots__status=Plot.STATUS_ON_HOLD)),
+        sold=Count('plots', filter=Q(plots__status=Plot.STATUS_SOLD)),
+    )
+
+
+@api_view(['GET'])
+def project_list(request):
+    projects = annotated_projects().filter(status=Project.STATUS_ACTIVE)
+    return Response(ProjectListSerializer(projects, many=True).data)
+
+
+@api_view(['GET'])
+def project_detail(request, pk):
+    project = Project.objects.filter(pk=pk).first()
+    if project is None:
+        return Response({'detail': 'Project not found.'}, status=status.HTTP_404_NOT_FOUND)
+    project = annotated_projects().filter(pk=project.pk).first()
+    return Response(ProjectDetailSerializer(project).data)
 
 
