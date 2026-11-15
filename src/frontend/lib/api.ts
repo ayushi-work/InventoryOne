@@ -178,3 +178,57 @@ export type Commission = {
 };
 
 export const fetchCommissions = (token: string) => api<Commission[]>("/api/commissions/", { token });
+
+// ===== Administration =====
+export type AdminStats = {
+  brokers: number;
+  kyc_pending: number;
+  kyc_approved: number;
+  projects: number;
+  plots: number;
+  available_plots: number;
+  on_hold_plots: number;
+  sold_plots: number;
+  pending_bookings: number;
+  approved_bookings: number;
+  rejected_bookings: number;
+  commissions: number;
+  unreleased_commissions: number;
+};
+
+export const fetchAdminStats = (token: string) => api<AdminStats>("/api/admin/stats/", { token });
+
+export const fetchAdminBookings = (token: string, status?: string) =>
+  api<Booking[]>(`/api/admin/bookings/${status ? `?status=${status}` : ""}`, { token });
+
+export const decideBooking = (token: string, id: number, action: "approve" | "reject") =>
+  api<Booking>(`/api/admin/bookings/${id}/decide/`, {
+    method: "POST",
+    body: { action },
+    token,
+  });
+
+export const releaseCommission = (token: string, id: number) =>
+  api<Commission>(`/api/admin/commissions/${id}/release/`, { method: "POST", token });
+
+export const fetchAdminCommissions = (token: string) =>
+  api<Commission[]>("/api/admin/commissions/", { token });
+
+// ===== Formatting helpers =====
+export function formatMoney(value: number | string | null | undefined): string {
+  if (value === null || value === undefined || value === "") return "—";
+  const n = typeof value === "string" ? parseFloat(value) : value;
+  if (Number.isNaN(n)) return "—";
+  return "₹" + n.toLocaleString("en-IN", { maximumFractionDigits: 0 });
+}
+
+export function formatDate(value: string | null): string {
+  if (!value) return "—";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}

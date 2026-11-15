@@ -12,15 +12,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny, IsAdminUser
 from rest_framework.response import Response
 
-from .models import (
-    Booking,
-    Broker,
-    Commission,
-    Customer,
-    OTPCode,
-    Plot,
-    Project,
-)
+from .models import Booking, Broker, Commission, Customer, OTPCode, Plot, Project
 from .serializers import (
     BookingSerializer,
     BrokerSerializer,
@@ -193,3 +185,100 @@ def commissions(request):
     return Response(CommissionSerializer(qs, many=True).data)
 
 
+# ---------------------------------------------------------------------------
+# Administration
+# ---------------------------------------------------------------------------
+
+@api_view(['GET'])
+@permission_classes([IsAdminUser])
+def admin_stats(request):
+    return Response({
+        'brokers': Broker.objects.count(),
+        'kyc_pending': Broker.objects.filter(kyc_status=Broker.KYC_PENDING).count(),
+        'kyc_approved': Broker.objects.filter(kyc_status=Broker.KYC_APPROVED).count(),
+        'projects': Project.objects.count(),
+        'plots': Plot.objects.count(),
+        'available_plots': Plot.objects.filter(status=Plot.STATUS_AVAILABLE).count(),
+        'on_hold_plots': Plot.objects.filter(status=Plot.STATUS_ON_HOLD).count(),
+        'sold_plots': Plot.objects.filter(status=Plot.STATUS_SOLD).count(),
+        'pending_bookings': Booking.objects.filter(status=Booking.STATUS_PENDING).count(),
+        'approved_bookings': Booking.objects.filter(status=Booking.STATUS_APPROVED).count(),
+        'rejected_bookings': Booking.objects.filter(status=Booking.STATUS_REJECTED).count(),
+        'commissions': Commission.objects.count(),
+        'unreleased_commissions': Commission.objects.filter(released=False).count(),
+    })
+
+
+@api_view(['GET'])
+@permission_classes([IsAdminUser])
+def admin_bookings(request):
+    qs = Booking.objects.select_related(
+        'plot', 'plot__project', 'customer', 'broker__user').all()
+    status_filter = request.query_params.get('status')
+    if status_filter:
+        qs = qs.filter(status=status_filter)
+    return Response(BookingSerializer(qs, many=True).data)
+
+
+@api_view(['POST'])
+@permission_classes([IsAdminUser])
+def admin_decide_booking(request, pk):
+    booking = Booking.objects.select_related('plot', 'plot__project').filter(pk=pk).first()
+    if booking is None:
+        return Response({'detail': 'Booking not found.'}, status=status.HTTP_404_NOT_FOUND)
+    if booking.status != Booking.STATUS_PENDING:
+        return Response({'detail': 'This booking has already been decided.'},
+                        status=status.HTTP_400_BAD_REQUEST)
+
+    action = request.data.get('action')
+    if action not in ('approve', 'reject'):
+        return Response({'detail': 'Action must be "approve" or "reject".'},
+                        status=status.HTTP_400_BAD_REQUEST)
+
+    if action == 'approve':
+        booking.status = Booking.STATUS_APPROVED
+        booking.plot.status = Plot.STATUS_SOLD
+        gross = booking.plot.total_cost * booking.commission_pct / Decimal(100)
+        tds = gross * TDS_PCT / Decimal(100)
+        Commission.objects.create(
+            booking=booking,
+            broker=booking.broker,
+            amount=round(gross, 2),
+            tds_pct=TDS_PCT,
+            tds_amount=round(tds, 2),
+            net_amount=round(gross - tds, 2),
+        )
+    else:
+        booking.status = Booking.STATUS_REJECTED
+        booking.plot.status = Plot.STATUS_AVAILABLE
+
+    booking.decided_at = timezone.now()
+    booking.save()
+    booking.plot.save(update_fields=['status'])
+    return Response(BookingSerializer(booking).data)
+
+
+@api_view(['GET'])
+@permission_classes([IsAdminUser])
+def admin_commissions(request):
+    qs = Commission.objects.select_related(
+        'booking__plot', 'booking__plot__project', 'booking__customer', 'broker__user')
+    if request.query_params.get('released') == 'false':
+        qs = qs.filter(released=False)
+    return Response(CommissionSerializer(qs, many=True).data)
+
+
+@api_view(['POST'])
+@permission_classes([IsAdminUser])
+def admin_release_commission(request, pk):
+    commission = Commission.objects.select_related('booking').filter(pk=pk).first()
+    if commission is None:
+        return Response({'detail': 'Commission not found.'}, status=status.HTTP_404_NOT_FOUND)
+    if commission.released:
+        return Response({'detail': 'Commission already released.'},
+                        status=status.HTTP_400_BAD_REQUEST)
+
+    commission.released = True
+    commission.released_at = timezone.now()
+    commission.save(update_fields=['released', 'released_at'])
+    return Response(CommissionSerializer(commission).data)
