@@ -6,7 +6,20 @@ from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
-from core.models import Booking, Broker, Commission, Customer, Plot, Project
+from core.models import (
+    AuditLog,
+    Booking,
+    Broker,
+    Commission,
+    CompanyProfile,
+    Customer,
+    Document,
+    Notification,
+    Plot,
+    Project,
+    SupportTicket,
+)
+from core.services.documents import build_kyc_summary_pdf, build_price_list_pdf, save_document
 
 PROJECTS = [
     {
@@ -66,6 +79,8 @@ class Command(BaseCommand):
             User.objects.filter(is_superuser=False).delete()
             self.stdout.write('Existing core data removed.')
 
+        CompanyProfile.load()
+
         admin = self._create_admin()
         broker, other_broker = self._create_brokers()
 
@@ -89,11 +104,18 @@ class Command(BaseCommand):
         self._create_bookings(broker, customers, projects)
         self._create_bookings(other_broker, other_customers, projects)
 
+        self._create_documents(broker, projects)
+        self._create_notifications(broker, other_broker, projects)
+        self._create_tickets(broker)
+        self._create_audit_log(admin)
+
         self.stdout.write(self.style.SUCCESS(
             'Seed complete: '
             f'{Project.objects.count()} projects, {Plot.objects.count()} plots, '
             f'{Broker.objects.count()} brokers, {Customer.objects.count()} customers, '
-            f'{Booking.objects.count()} bookings, {Commission.objects.count()} commissions.'
+            f'{Booking.objects.count()} bookings, {Commission.objects.count()} commissions, '
+            f'{Document.objects.count()} documents, {Notification.objects.count()} notifications, '
+            f'{SupportTicket.objects.count()} tickets.'
         ))
         self.stdout.write(f'Admin login: {admin.username} / admin123')
         self.stdout.write('Broker login: broker@example.com (OTP, dev code shown in response)')
@@ -179,7 +201,6 @@ class Command(BaseCommand):
     def _create_bookings(self, broker, customers, projects):
         if broker.bookings.exists():
             return
-
         # One pending booking -> admin approves it (creates a commission).
         project, spec = projects[0]
         plot = project.plots.filter(status=Plot.STATUS_AVAILABLE).first()
@@ -227,3 +248,97 @@ class Command(BaseCommand):
             )
             plot2.status = Plot.STATUS_ON_HOLD
             plot2.save(update_fields=['status'])
+
+    def _create_documents(self, broker, projects):
+        """Generate sample KYC uploads and a price list."""
+        if broker.documents.exists():
+            return
+
+        content, content_type = build_kyc_summary_pdf(broker)
+        save_document(
+            kind=Document.KYC_PAN,
+            title=f'PAN card - {broker.user.first_name}',
+            content=content,
+            content_type=content_type,
+            broker=broker,
+        )
+
+        project, _ = projects[0]
+        content, content_type = build_price_list_pdf(project)
+        save_document(
+            kind=Document.PRICE_LIST,
+            title=f'Price list - {project.name}',
+            content=content,
+            content_type=content_type,
+        )
+
+    def _create_notifications(self, broker, other_broker, projects):
+        if broker.notifications.exists():
+            return
+        project, _ = projects[0]
+        Notification.objects.create(
+            broker=broker,
+            title=f'New project launched: {project.name}',
+            body=f'{project.location} — {project.plots.count()} plots available.',
+            kind=Notification.KIND_PROJECT,
+            link=f'/projects/{project.pk}',
+        )
+        Notification.objects.create(
+            broker=broker,
+            title='Festive scheme: 3% additional discount',
+            body='Apply the festive scheme code FESTIVE3 on bookings raised this week.',
+            kind=Notification.KIND_SCHEME,
+            link='/projects',
+        )
+        Notification.objects.create(
+            broker=broker,
+            title='Welcome to InventoryOne',
+            body='Complete your KYC to start booking plots for customers.',
+            kind=Notification.KIND_SYSTEM,
+            link='/profile',
+            read=True,
+        )
+        Notification.objects.create(
+            broker=other_broker,
+            title='Your KYC is pending review',
+            body='Upload the cancelled cheque to complete verification.',
+            kind=Notification.KIND_SYSTEM,
+            link='/profile',
+        )
+
+    def _create_tickets(self, broker):
+        if broker.tickets.exists():
+            return
+        SupportTicket.objects.create(
+            broker=broker,
+            subject='Payment link for booking BK-00002',
+            message='Please share the payment link for the token amount of booking BK-00002.',
+            status=SupportTicket.STATUS_OPEN,
+            priority=SupportTicket.PRIORITY_HIGH,
+        )
+        SupportTicket.objects.create(
+            broker=broker,
+            subject='Correction needed in customer phone number',
+            message='The phone number saved for customer Ramesh Kumar has one digit missing.',
+            status=SupportTicket.STATUS_RESOLVED,
+            priority=SupportTicket.PRIORITY_NORMAL,
+            response='The number has been corrected in the CRM. Thank you for reporting it.',
+            resolved_at=timezone.now(),
+        )
+
+    def _create_audit_log(self, admin):
+        if AuditLog.objects.exists():
+            return
+        for action, entity, details in [
+            ('booking.approved', 'Booking', {'plot': 'GVH-001'}),
+            ('commission.released', 'Commission', {'amount': '26190.00'}),
+            ('project.created', 'Project', {'code': 'GVH'}),
+        ]:
+            AuditLog.objects.create(
+                actor=admin,
+                actor_name=admin.get_full_name() or admin.username,
+                action=action,
+                entity_type=entity,
+                entity_id='1',
+                details=details,
+            )
