@@ -10,6 +10,7 @@ Thumbs.db
 # Dependencies
 node_modules/
 venv/
+.venv/
 .env
 
 # Python
@@ -32,6 +33,11 @@ src/backend/staticfiles/
 src/backend/media/
 src/backend/db.sqlite3
 src/backend/.env
+src/backend/.venv/
 
 # Logs
 *.log
+
+# Playwright / test artefacts
+.playwright-mcp/
+test-results/
