@@ -477,3 +477,55 @@ a {
   text-align: center;
   color: var(--muted);
 }
+
+/* ---------- Drawer ---------- */
+.drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 25, 45, 0.42);
+  z-index: 40;
+}
+
+.drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  height: 100%;
+  width: 380px;
+  max-width: 92vw;
+  background: #fff;
+  z-index: 50;
+  box-shadow: -8px 0 28px rgba(0, 0, 0, 0.18);
+  padding: 22px;
+  overflow-y: auto;
+}
+
+.drawer h3 {
+  margin: 0 0 4px;
+  color: var(--navy);
+  font-size: 20px;
+}
+
+.kv {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 14px;
+}
+
+.kv .k {
+  color: var(--muted);
+}
+
+.kv .v {
+  font-weight: 600;
+  color: var(--navy);
+}
+
+.price {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--teal);
+  margin: 12px 0 4px;
+}
