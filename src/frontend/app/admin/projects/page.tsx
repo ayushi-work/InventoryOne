@@ -59,8 +59,14 @@ export default function AdminProjectsPage() {
       window.location.href = "/projects";
       return;
     }
-    void loadProjects();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    fetchAdminProjects(session.token)
+      .then((data) => {
+        setProjects(data);
+        setSelected((prev) => prev ?? data[0] ?? null);
+      })
+      .catch((err) =>
+        setError(err instanceof Error ? err.message : "Could not load projects.")
+      );
   }, [session, loading]);
 
   useEffect(() => {

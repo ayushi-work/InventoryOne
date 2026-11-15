@@ -16,6 +16,7 @@ export default function NotificationBell() {
     let active = true;
 
     const load = () => {
+      if (document.hidden) return;
       fetchUnreadCount(session.token)
         .then((data) => {
           if (active) setUnread(data.unread);
@@ -24,11 +25,13 @@ export default function NotificationBell() {
     };
 
     load();
-    const timer = setInterval(load, 20000);
+    const timer = setInterval(load, 30000);
+    document.addEventListener("visibilitychange", load);
 
     return () => {
       active = false;
       clearInterval(timer);
+      document.removeEventListener("visibilitychange", load);
     };
   }, [session, loading]);
 

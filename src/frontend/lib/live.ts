@@ -26,7 +26,11 @@ export type InventoryEvent = {
 export function useLiveInventory(onEvent: (event: InventoryEvent) => void) {
   const [connected, setConnected] = useState(false);
   const handler = useRef(onEvent);
-  handler.current = onEvent;
+
+  // Keep the latest callback in the ref without touching it during render.
+  useEffect(() => {
+    handler.current = onEvent;
+  }, [onEvent]);
 
   useEffect(() => {
     let socket: WebSocket | null = null;
@@ -79,7 +83,7 @@ export function useLiveInventory(onEvent: (event: InventoryEvent) => void) {
 
     // If the socket does not open quickly, fall back to polling anyway.
     const handshakeTimer = setTimeout(() => {
-      if (!connected && socket && socket.readyState !== WebSocket.OPEN) {
+      if (socket && socket.readyState !== WebSocket.OPEN) {
         startPolling();
       }
     }, 4000);

@@ -50,8 +50,12 @@ export default function AdminCommissionsPage() {
   }
 
   useEffect(() => {
-    void loadCommissions();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (!session || session.role !== "admin") return;
+    fetchAdminCommissions(session.token)
+      .then(setCommissions)
+      .catch((err) =>
+        setError(err instanceof Error ? err.message : "Failed to load commissions.")
+      );
   }, [session]);
 
   async function release(id: number) {

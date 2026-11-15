@@ -2,7 +2,7 @@
 
 import { Suspense } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "../../../lib/auth";
 import { useLiveInventory } from "../../../lib/live";
 import {
@@ -51,10 +51,9 @@ function ProjectDetail() {
   const [tokenAmount, setTokenAmount] = useState("");
   const [paymentMode, setPaymentMode] = useState("upi");
   const [useNewCustomer, setUseNewCustomer] = useState(false);
-  const [live, setLive] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<string>("");
 
-  const refresh = useCallback(async () => {
+  const refresh = async () => {
     if (!session || !params?.id) return;
     const fresh = await fetchProject(session.token, params.id).catch(() => null);
     if (fresh) {
@@ -63,20 +62,21 @@ function ProjectDetail() {
         new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" })
       );
     }
-  }, [session, params?.id]);
+  };
+
+  const refreshRef = useRef(refresh);
+  useEffect(() => {
+    refreshRef.current = refresh;
+  });
 
   const { connected } = useLiveInventory((event) => {
     if (event.type === "poll") {
-      void refresh();
+      void refreshRef.current();
       return;
     }
     if (event.project_id && String(event.project_id) !== String(params?.id)) return;
-    void refresh();
+    void refreshRef.current();
   });
-
-  useEffect(() => {
-    setLive(connected);
-  }, [connected]);
 
   useEffect(() => {
     if (loading) return;
@@ -151,9 +151,9 @@ function ProjectDetail() {
         <h1 className="page-title" style={{ marginTop: 14 }}>
           {project.name}
         </h1>
-        <span className={`live-pill ${live ? "on" : ""}`} style={{ marginTop: 14 }}>
+        <span className={`live-pill ${connected ? "on" : ""}`} style={{ marginTop: 14 }}>
           <span className="live-dot" />
-          {live ? "Live updates on" : "Auto-refresh"}
+          {connected ? "Live updates on" : "Auto-refresh"}
         </span>
         {lastUpdate && (
           <span className="muted" style={{ marginTop: 16 }}>
