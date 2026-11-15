@@ -82,3 +82,19 @@ def verify_otp(request):
     })
 
 
+# ---------------------------------------------------------------------------
+# Broker profile / KYC
+# ---------------------------------------------------------------------------
+
+@api_view(['GET', 'PATCH'])
+def me(request):
+    broker = get_broker(request)
+    if request.method == 'GET':
+        return Response(BrokerSerializer(broker).data)
+
+    serializer = BrokerSerializer(broker, data=request.data, partial=True)
+    serializer.is_valid(raise_exception=True)
+    serializer.save()
+    return Response(serializer.data)
+
+
