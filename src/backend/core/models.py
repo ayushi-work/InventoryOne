@@ -180,3 +180,21 @@ class Booking(models.Model):
 
     def __str__(self):
         return f'{self.plot} / {self.customer} / {self.status}'
+
+
+class Commission(models.Model):
+    booking = models.OneToOneField(Booking, on_delete=models.CASCADE, related_name='commission')
+    broker = models.ForeignKey(Broker, on_delete=models.CASCADE, related_name='commissions')
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    tds_pct = models.DecimalField(max_digits=5, decimal_places=2, default=10)
+    tds_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    net_amount = models.DecimalField(max_digits=12, decimal_places=2)
+    released = models.BooleanField(default=False)
+    released_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.broker} × {self.amount}'

@@ -15,6 +15,7 @@ from rest_framework.response import Response
 from .models import (
     Booking,
     Broker,
+    Commission,
     Customer,
     OTPCode,
     Plot,
@@ -23,6 +24,7 @@ from .models import (
 from .serializers import (
     BookingSerializer,
     BrokerSerializer,
+    CommissionSerializer,
     CustomerSerializer,
     ProjectDetailSerializer,
     ProjectListSerializer,
@@ -166,14 +168,28 @@ def bookings(request):
     serializer = BookingSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
 
-    plot = Plot.objects.select_for_update().get(pk=serializer.validated_data['plot'].pk)
-    if plot.status != Plot.STATUS_AVAILABLE:
-        return Response({'detail': 'That plot is no longer available.'},
-                        status=status.HTTP_409_CONFLICT)
+    with transaction.atomic():
+        plot = Plot.objects.select_for_update().get(pk=serializer.validated_data['plot'].pk)
+        if plot.status != Plot.STATUS_AVAILABLE:
+            return Response({'detail': 'That plot is no longer available.'},
+                            status=status.HTTP_409_CONFLICT)
 
-    booking = serializer.save(broker=broker, status=Booking.STATUS_PENDING)
-    plot.status = Plot.STATUS_ON_HOLD
-    plot.save(update_fields=['status'])
+        booking = serializer.save(broker=broker, status=Booking.STATUS_PENDING)
+        plot.status = Plot.STATUS_ON_HOLD
+        plot.save(update_fields=['status'])
+
     return Response(BookingSerializer(booking).data, status=status.HTTP_201_CREATED)
+
+
+# ---------------------------------------------------------------------------
+# Commissions
+# ---------------------------------------------------------------------------
+
+@api_view(['GET'])
+def commissions(request):
+    broker = get_broker(request)
+    qs = Commission.objects.filter(broker=broker).select_related(
+        'booking__plot', 'booking__customer', 'booking__plot__project')
+    return Response(CommissionSerializer(qs, many=True).data)
 
 

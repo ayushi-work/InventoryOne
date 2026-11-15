@@ -10,4 +10,5 @@ urlpatterns = [
     path('api/projects/<int:pk>/', views.project_detail, name='project_detail'),
     path('api/customers/', views.customers, name='customers'),
     path('api/bookings/', views.bookings, name='bookings'),
+    path('api/commissions/', views.commissions, name='commissions'),
 ]

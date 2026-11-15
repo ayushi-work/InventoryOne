@@ -1,13 +1,7 @@
 """Serializers for the InventoryOne API."""
 from rest_framework import serializers
 
-from .models import (
-    Booking,
-    Broker,
-    Customer,
-    Plot,
-    Project,
-)
+from .models import Booking, Broker, Commission, Customer, Plot, Project
 
 
 class PlotSerializer(serializers.ModelSerializer):
@@ -87,3 +81,20 @@ class BookingSerializer(serializers.ModelSerializer):
             return obj.commission.net_amount
         except Commission.DoesNotExist:
             return None
+
+
+class CommissionSerializer(serializers.ModelSerializer):
+    broker_id = serializers.IntegerField(source='broker.id', read_only=True)
+    broker_name = serializers.CharField(source='broker.user.first_name', read_only=True)
+    customer_name = serializers.CharField(source='booking.customer.name', read_only=True)
+    plot_label = serializers.SerializerMethodField()
+    project_name = serializers.CharField(source='booking.plot.project.name', read_only=True)
+
+    class Meta:
+        model = Commission
+        fields = ['id', 'booking', 'broker_id', 'broker_name', 'customer_name',
+                  'plot_label', 'project_name', 'amount', 'tds_pct', 'tds_amount',
+                  'net_amount', 'released', 'released_at', 'created_at']
+
+    def get_plot_label(self, obj):
+        return str(obj.booking.plot)
