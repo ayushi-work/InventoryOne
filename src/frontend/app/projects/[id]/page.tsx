@@ -2,8 +2,9 @@
 
 import { Suspense } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "../../../lib/auth";
+import { useLiveInventory } from "../../../lib/live";
 import {
   createBooking,
   createCustomer,
@@ -14,6 +15,8 @@ import {
   type Plot,
   type Project,
 } from "../../../lib/api";
+
+const MAPS_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? "";
 
 export default function ProjectDetailPage() {
   return (
@@ -48,6 +51,32 @@ function ProjectDetail() {
   const [tokenAmount, setTokenAmount] = useState("");
   const [paymentMode, setPaymentMode] = useState("upi");
   const [useNewCustomer, setUseNewCustomer] = useState(false);
+  const [live, setLive] = useState(false);
+  const [lastUpdate, setLastUpdate] = useState<string>("");
+
+  const refresh = useCallback(async () => {
+    if (!session || !params?.id) return;
+    const fresh = await fetchProject(session.token, params.id).catch(() => null);
+    if (fresh) {
+      setProject(fresh);
+      setLastUpdate(
+        new Date().toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" })
+      );
+    }
+  }, [session, params?.id]);
+
+  const { connected } = useLiveInventory((event) => {
+    if (event.type === "poll") {
+      void refresh();
+      return;
+    }
+    if (event.project_id && String(event.project_id) !== String(params?.id)) return;
+    void refresh();
+  });
+
+  useEffect(() => {
+    setLive(connected);
+  }, [connected]);
 
   useEffect(() => {
     if (loading) return;
@@ -94,8 +123,7 @@ function ProjectDetail() {
       setTokenAmount("");
       setNewName("");
       setNewPhone("");
-      const fresh = await fetchProject(session.token, project!.id);
-      setProject(fresh);
+      await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not raise booking.");
     } finally {
@@ -119,12 +147,44 @@ function ProjectDetail() {
         ← All projects
       </button>
 
-      <h1 className="page-title" style={{ marginTop: 14 }}>
-        {project.name}
-      </h1>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+        <h1 className="page-title" style={{ marginTop: 14 }}>
+          {project.name}
+        </h1>
+        <span className={`live-pill ${live ? "on" : ""}`} style={{ marginTop: 14 }}>
+          <span className="live-dot" />
+          {live ? "Live updates on" : "Auto-refresh"}
+        </span>
+        {lastUpdate && (
+          <span className="muted" style={{ marginTop: 16 }}>
+            Updated {lastUpdate}
+          </span>
+        )}
+      </div>
       <p className="page-sub">
         {project.code} · {project.location} · {project.description}
       </p>
+
+      <div className="map-wrap">
+        {MAPS_KEY ? (
+          <iframe
+            className="map-frame"
+            title={`${project.name} location`}
+            loading="lazy"
+            referrerPolicy="no-referrer-when-downgrade"
+            src={`https://www.google.com/maps/embed/v1/place?key=${MAPS_KEY}&q=${encodeURIComponent(
+              project.location
+            )}`}
+          />
+        ) : (
+          <div className="map-fallback">
+            <strong>{project.location}</strong>
+            <div style={{ marginTop: 6 }}>
+              Add <code>NEXT_PUBLIC_GOOGLE_MAPS_API_KEY</code> to show the interactive map.
+            </div>
+          </div>
+        )}
+      </div>
 
       {notice && <div className="ok">{notice}</div>}
       {error && <div className="error">{error}</div>}

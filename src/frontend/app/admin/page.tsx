@@ -79,9 +79,45 @@ export default function AdminDashboard() {
             <span className="btn small">Open commissions →</span>
           </div>
         </Link>
+        <Link href="/admin/projects">
+          <div className="card">
+            <h3>Project & inventory</h3>
+            <p className="muted">
+              Create projects, maintain the plot grid and control plot availability.
+            </p>
+            <span className="btn small">Manage inventory →</span>
+          </div>
+        </Link>
+        <Link href="/admin/tickets">
+          <div className="card">
+            <h3>Support tickets</h3>
+            <p className="muted">
+              Respond to broker support requests and track them to resolution.
+            </p>
+            <span className="btn small">Open tickets →</span>
+          </div>
+        </Link>
+        <Link href="/admin/brokers">
+          <div className="card">
+            <h3>Brokers & KYC</h3>
+            <p className="muted">
+              Verify broker KYC submissions and broadcast announcements to all brokers.
+            </p>
+            <span className="btn small">Open brokers →</span>
+          </div>
+        </Link>
+        <Link href="/admin/audit">
+          <div className="card">
+            <h3>Audit trail</h3>
+            <p className="muted">
+              Every approval, release and inventory change, recorded with timestamps.
+            </p>
+            <span className="btn small">Open audit log →</span>
+          </div>
+        </Link>
         <Link href="/projects">
           <div className="card">
-            <h3>Project inventory</h3>
+            <h3>Live inventory</h3>
             <p className="muted">
               Browse active projects and live plot availability across every layout.
             </p>

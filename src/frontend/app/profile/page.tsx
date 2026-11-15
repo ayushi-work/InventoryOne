@@ -2,7 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { useAuth } from "../../lib/auth";
-import { fetchMe, updateMe, type Broker } from "../../lib/api";
+import {
+  fetchDocuments,
+  fetchMe,
+  updateMe,
+  uploadKycDocument,
+  type Broker,
+  type Document,
+} from "../../lib/api";
 
 const EMPTY = {
   phone: "",
@@ -22,6 +29,20 @@ export default function ProfilePage() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
+  const [docs, setDocs] = useState<Document[]>([]);
+  const [uploadKind, setUploadKind] = useState("kyc_pan");
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+
+  useEffect(() => {
+    if (loading) return;
+    if (!session) {
+      window.location.href = "/";
+      return;
+    }
+    fetchDocuments(session.token)
+      .then(setDocs)
+      .catch(() => undefined);
+  }, [session, loading]);
 
   useEffect(() => {
     if (loading) return;
@@ -74,6 +95,30 @@ export default function ProfilePage() {
       </main>
     );
   }
+
+  async function uploadKyc(e: React.FormEvent) {
+    e.preventDefault();
+    if (!session || !uploadFile) return;
+    setError("");
+    setNotice("");
+    setBusy(true);
+    try {
+      const form = new FormData();
+      form.append("kind", uploadKind);
+      form.append("title", uploadFile.name);
+      form.append("file", uploadFile);
+      const created = await uploadKycDocument(session.token, form);
+      setDocs((prev) => [created, ...prev]);
+      setUploadFile(null);
+      setNotice(`Uploaded "${created.title}".`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Upload failed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const kycDocs = docs.filter((d) => d.kind.startsWith("kyc_"));
 
   return (
     <main className="container">
@@ -183,6 +228,54 @@ export default function ProfilePage() {
             </div>
             <button className="btn" type="submit" disabled={busy}>
               {busy ? "Saving…" : "Save details"}
+            </button>
+          </form>
+
+          <hr style={{ border: 0, borderTop: "1px solid var(--line)", margin: "20px 0" }} />
+
+          <h3>KYC documents</h3>
+          {kycDocs.length === 0 ? (
+            <p className="muted">No documents uploaded yet.</p>
+          ) : (
+            <ul style={{ paddingLeft: 18, margin: "0 0 14px" }}>
+              {kycDocs.map((d) => (
+                <li key={d.id} style={{ marginBottom: 4 }}>
+                  <a href={d.download_url} target="_blank" rel="noreferrer">
+                    {d.title}
+                  </a>{" "}
+                  <span className="muted">({d.kind_display}, {d.size_kb} KB)</span>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <form onSubmit={uploadKyc}>
+            <div className="row">
+              <div className="field">
+                <label htmlFor="ukind">Document</label>
+                <select
+                  id="ukind"
+                  value={uploadKind}
+                  onChange={(e) => setUploadKind(e.target.value)}
+                >
+                  <option value="kyc_pan">PAN card</option>
+                  <option value="kyc_aadhaar">Aadhaar card</option>
+                  <option value="kyc_gst">GST certificate</option>
+                  <option value="kyc_cancelled_cheque">Cancelled cheque</option>
+                </select>
+              </div>
+              <div className="field">
+                <label htmlFor="ufile">File</label>
+                <input
+                  id="ufile"
+                  type="file"
+                  accept=".pdf,.png,.jpg,.jpeg"
+                  onChange={(e) => setUploadFile(e.target.files?.[0] ?? null)}
+                />
+              </div>
+            </div>
+            <button className="btn secondary" type="submit" disabled={busy || !uploadFile}>
+              {busy ? "Uploading…" : "Upload document"}
             </button>
           </form>
         </div>
