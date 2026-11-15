@@ -1,7 +1,19 @@
 """Serializers for the InventoryOne API."""
 from rest_framework import serializers
 
-from .models import Booking, Broker, Commission, Customer, Plot, Project
+from .models import (
+    AuditLog,
+    Booking,
+    Broker,
+    Commission,
+    CompanyProfile,
+    Customer,
+    Document,
+    Notification,
+    Plot,
+    Project,
+    SupportTicket,
+)
 
 
 class PlotSerializer(serializers.ModelSerializer):
@@ -98,3 +110,105 @@ class CommissionSerializer(serializers.ModelSerializer):
 
     def get_plot_label(self, obj):
         return str(obj.booking.plot)
+
+
+class OTPRequestSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+
+class OTPVerifySerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    code = serializers.CharField(max_length=6)
+
+
+class DocumentSerializer(serializers.ModelSerializer):
+    download_url = serializers.SerializerMethodField()
+    kind_display = serializers.CharField(source='get_kind_display', read_only=True)
+    size_kb = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Document
+        fields = ['id', 'kind', 'kind_display', 'title', 'download_url', 'content_type',
+                  'size_bytes', 'size_kb', 'booking', 'created_at']
+        read_only_fields = ['id', 'download_url', 'content_type', 'size_bytes', 'created_at']
+
+    def get_download_url(self, obj):
+        if not obj.file:
+            return ''
+        request = self.context.get('request')
+        url = obj.file.url
+        return request.build_absolute_uri(url) if request else url
+
+    def get_size_kb(self, obj):
+        return round((obj.size_bytes or 0) / 1024, 1)
+
+
+class NotificationSerializer(serializers.ModelSerializer):
+    kind_display = serializers.CharField(source='get_kind_display', read_only=True)
+
+    class Meta:
+        model = Notification
+        fields = ['id', 'title', 'body', 'kind', 'kind_display', 'link', 'read', 'created_at']
+        read_only_fields = ['id', 'created_at']
+
+
+class SupportTicketSerializer(serializers.ModelSerializer):
+    broker_name = serializers.CharField(source='broker.user.first_name', read_only=True)
+
+    class Meta:
+        model = SupportTicket
+        fields = ['id', 'broker', 'broker_name', 'subject', 'message', 'status',
+                  'priority', 'response', 'created_at', 'updated_at', 'resolved_at']
+        read_only_fields = ['id', 'broker', 'response', 'created_at', 'updated_at', 'resolved_at']
+
+
+class CompanyProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CompanyProfile
+        fields = ['name', 'support_email', 'support_phone', 'rm_name', 'rm_phone', 'rm_email']
+
+
+class AuditLogSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AuditLog
+        fields = ['id', 'actor_name', 'action', 'entity_type', 'entity_id', 'details', 'created_at']
+
+
+class ProjectWriteSerializer(serializers.ModelSerializer):
+    """Create / update a project (administrator only)."""
+
+    class Meta:
+        model = Project
+        fields = ['id', 'name', 'code', 'location', 'status', 'description']
+
+
+class PlotWriteSerializer(serializers.ModelSerializer):
+    """Create / update a single plot (administrator only)."""
+
+    class Meta:
+        model = Plot
+        fields = ['id', 'project', 'plot_number', 'size_sq_yds', 'facing', 'status',
+                  'bsp', 'plc_pct', 'discount_pct']
+
+
+class PlotInputSerializer(serializers.ModelSerializer):
+    """Plot payload without the project (the project comes from the URL)."""
+
+    class Meta:
+        model = Plot
+        fields = ['plot_number', 'size_sq_yds', 'facing', 'status', 'bsp',
+                  'plc_pct', 'discount_pct']
+
+
+class BulkPlotSerializer(serializers.Serializer):
+    """Bulk-create the plot grid of a project in one call."""
+
+    plots = PlotInputSerializer(many=True)
+
+    def validate_plots(self, value):
+        numbers = [p.get('plot_number') for p in value]
+        duplicates = {n for n in numbers if numbers.count(n) > 1}
+        if duplicates:
+            raise serializers.ValidationError(
+                f'Duplicate plot numbers: {sorted(duplicates)}')
+        return value
