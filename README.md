@@ -77,7 +77,13 @@ InventoryOne/
 | `docs/SRS/srs.md`              | 4          | Software Requirements Specification        |
 | `docs/UML/use-case.md`         | 5          | Use case diagram and use case narratives    |
 | `docs/design-analysis.md`      | 8          | Software design principles analysis        |
+| `docs/UML/er-diagram.md`       | —          | Entity relationship diagram                 |
+| `docs/UML/class-diagram.md`    | —          | Class diagram                              |
+| `docs/UML/sequence-diagram.md` | —          | Sequence diagrams for the core workflows   |
+| `docs/UML/activity-diagram.md` | —          | Activity diagrams                          |
 | `docs/presentation/`           | —          | Student presentation deck (PPTX + Markdown) |
+| `test/test-cases.md`           | —          | Manual test cases and exit criteria        |
+| `test/api_smoke.py`            | —          | End-to-end API smoke test                  |
 
 ---
 
@@ -106,7 +112,18 @@ python manage.py migrate
 python manage.py seed_demo
 
 # Start the API on http://127.0.0.1:8000
-python manage.py runserver
+# Daphne serves both HTTP and the live-inventory WebSocket
+python -m daphne -b 127.0.0.1 -p 8000 inventoryone.asgi:application
+```
+
+Optional services (the app degrades gracefully without them):
+
+```bash
+# Redis - powers live inventory updates and Celery background jobs
+redis-server
+
+# Celery worker - demand letters and notification fan-out
+celery -A inventoryone worker -l info
 ```
 
 ## 2. Frontend (Next.js)
@@ -119,46 +136,103 @@ npm run dev      # http://127.0.0.1:3000
 ```
 
 The frontend talks to the API at `http://127.0.0.1:8000` by default. Override it with
-`NEXT_PUBLIC_API_URL` if the API runs elsewhere.
+`NEXT_PUBLIC_API_URL` (and `NEXT_PUBLIC_WS_URL` for the WebSocket) if the API runs
+elsewhere.
+
+## 3. Docker (full stack)
+
+```bash
+cp .env.example .env   # then fill in the values
+docker compose up --build
+```
+
+Brings up PostgreSQL, Redis, the Django/Daphne backend, a Celery worker and the
+Next.js frontend.
 
 ## Demo Logins
 
-| Role                   | Email                    | Notes                                   |
-| ---------------------- | ------------------------ | --------------------------------------- |
-| Broker                 | `broker@example.com`     | Sign in with OTP (dev code is shown)    |
-| Broker (KYC pending)   | `priya.broker@example.com` | Sign in with OTP                      |
-| Company Administrator  | `admin@inventoryone.local` | Sign in with OTP; Django Admin password `admin123` |
+| Role                   | Email                     | Notes                                |
+| ---------------------- | ------------------------- | ------------------------------------ |
+| Broker                 | `broker@example.com`      | Sign in with OTP (dev code is shown) |
+| Broker (KYC pending)   | `priya.broker@example.com`| Sign in with OTP                     |
+| Company Administrator  | `admin@inventoryone.local`| Sign in with OTP; Django Admin password `admin123` |
 
 In development the OTP is returned directly by `POST /api/auth/request-otp/` because e-mail
-delivery is stubbed. Set `OTP_DEBUG_MODE = False` in `settings.py` for production.
+delivery is stubbed. Set `OTP_DEBUG_MODE = False` in `src/backend/.env` for production.
 
-## 3. Tests
+## 4. Tests
 
 ```bash
-cd src/backend
-python manage.py test core
+# Unit + API test suite (33 tests)
+cd src/backend && python manage.py test core
+
+# End-to-end smoke test against a running server (41 checks)
+python test/api_smoke.py
+
+# Frontend
+cd src/frontend && npm run lint && npm run build
 ```
+
+## Feature Overview
+
+| Area | What it does |
+| ---- | ------------ |
+| Authentication | OTP-based registration and login, token auth, rate limiting |
+| KYC | PAN / Aadhaar / GST / cancelled cheque uploads (S3 or local disk), bank details, approval workflow |
+| Projects & inventory | Live colour-coded availability, plot CRUD, bulk plot grid creation, Google Maps embed |
+| Customers | CRM-style registration linked to the broker |
+| Bookings | Token amount + payment mode, row-locked double-booking prevention, approval/rejection |
+| Commission | 2 % of plot cost, 10 % TDS, net payable, release workflow |
+| Documents | Price lists, demand letters and KYC summaries generated as PDFs |
+| Notifications | In-app feed plus Firebase Cloud Messaging push, bell badge with unread count |
+| Support | Ticket raising, relationship manager contact, admin response and resolution |
+| Live updates | Django Channels over Redis pushes plot changes to every open dashboard |
+| Audit trail | Every approval, release and inventory change is recorded with an actor and timestamp |
+| Administration | Dashboard statistics, project/plot management, KYC approval, broadcasts, ticket queue |
 
 ## API Overview
 
-| Method | Endpoint                            | Purpose                              |
-| ------ | ----------------------------------- | ------------------------------------ |
-| POST   | `/api/auth/request-otp/`            | Send an OTP to an e-mail             |
-| POST   | `/api/auth/verify-otp/`             | Verify OTP and receive an auth token |
-| GET    | `/api/me/`                          | Broker profile and KYC status         |
-| PATCH  | `/api/me/`                          | Update KYC and bank details          |
-| GET    | `/api/projects/`                    | Active projects with availability    |
-| GET    | `/api/projects/<id>/`               | Project detail with plot inventory   |
-| GET    | `/api/customers/`                   | Customers registered by the broker   |
-| POST   | `/api/customers/`                   | Register a customer                  |
-| GET    | `/api/bookings/`                    | Bookings raised by the broker        |
-| POST   | `/api/bookings/`                    | Raise a booking request              |
-| GET    | `/api/commissions/`                 | Commission ledger for the broker     |
-| GET    | `/api/admin/stats/`                 | Company dashboard statistics         |
-| GET    | `/api/admin/bookings/`              | All booking requests                 |
-| POST   | `/api/admin/bookings/<id>/decide/`  | Approve or reject a booking          |
-| GET    | `/api/admin/commissions/`           | All commissions                      |
+| Method | Endpoint                             | Purpose                              |
+| ------ | ------------------------------------ | ------------------------------------ |
+| GET    | `/api/health/`                       | Liveness / readiness probe           |
+| POST   | `/api/auth/request-otp/`             | Send an OTP to an e-mail             |
+| POST   | `/api/auth/verify-otp/`              | Verify OTP and receive an auth token |
+| GET    | `/api/me/`                           | Broker profile and KYC status         |
+| PATCH  | `/api/me/`                           | Update KYC and bank details          |
+| GET    | `/api/kyc/summary/`                  | Download the KYC summary PDF         |
+| GET    | `/api/projects/`                     | Active projects with availability    |
+| GET    | `/api/projects/<id>/`                | Project detail with plot inventory   |
+| GET    | `/api/customers/`                    | Customers registered by the broker   |
+| POST   | `/api/customers/`                    | Register a customer                  |
+| GET    | `/api/bookings/`                     | Bookings raised by the broker        |
+| POST   | `/api/bookings/`                     | Raise a booking request              |
+| GET    | `/api/commissions/`                  | Commission ledger for the broker     |
+| GET    | `/api/documents/`                    | KYC files and downloads              |
+| POST   | `/api/documents/`                    | Upload a KYC document                |
+| GET    | `/api/documents/<id>/download/`      | Download a stored document           |
+| POST   | `/api/projects/<id>/price-list/`     | Generate the price list PDF          |
+| POST   | `/api/bookings/<id>/demand-letter/`  | Generate the demand letter PDF       |
+| GET    | `/api/notifications/`                | Notification feed                    |
+| GET    | `/api/notifications/unread-count/`   | Unread badge count                   |
+| POST   | `/api/notifications/mark-read/`      | Mark notifications as read           |
+| GET    | `/api/tickets/`                      | Broker support tickets               |
+| POST   | `/api/tickets/`                      | Raise a support ticket               |
+| GET    | `/api/company/`                      | Company and relationship manager details |
+| GET    | `/api/admin/stats/`                  | Company dashboard statistics         |
+| GET    | `/api/admin/projects/`               | All projects                         |
+| POST   | `/api/admin/projects/`               | Create a project                     |
+| GET    | `/api/admin/projects/<id>/plots/`    | Plot inventory of a project          |
+| POST   | `/api/admin/projects/<id>/plots/`    | Bulk-create plots                    |
+| PUT    | `/api/admin/plots/<id>/`             | Update a plot                        |
+| GET    | `/api/admin/bookings/`               | All booking requests                 |
+| POST   | `/api/admin/bookings/<id>/decide/`   | Approve or reject a booking          |
+| GET    | `/api/admin/commissions/`            | All commissions                      |
 | POST   | `/api/admin/commissions/<id>/release/` | Release a commission              |
+| GET    | `/api/admin/tickets/`                | Support ticket queue                 |
+| GET    | `/api/admin/brokers/`                | All brokers                          |
+| POST   | `/api/admin/brokers/`                | Approve or reject KYC                |
+| POST   | `/api/admin/broadcast/`              | Notify every broker                  |
+| GET    | `/api/admin/audit-log/`              | Traceability records                 |
 
 ---
 
