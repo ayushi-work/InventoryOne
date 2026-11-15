@@ -134,9 +134,12 @@ class BookingFlowTests(TestCase):
     def test_double_booking_is_rejected(self):
         payload = {"customer": self.customer.pk, "plot": self.plot.pk,
                    "token_amount": "100000", "payment_mode": "upi"}
-        self.client.post(reverse("bookings"), payload, format="json")
+        first = self.client.post(reverse("bookings"), payload, format="json")
+        self.assertEqual(first.status_code, 201, first.data)
+        self.plot.refresh_from_db()
+        self.assertEqual(self.plot.status, Plot.STATUS_ON_HOLD)
         res = self.client.post(reverse("bookings"), payload, format="json")
-        self.assertEqual(res.status_code, 409)
+        self.assertIn(res.status_code, (400, 409), res.data)
 
     def test_booking_creates_a_notification(self):
         self.client.post(

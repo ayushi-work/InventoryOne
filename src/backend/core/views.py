@@ -233,18 +233,36 @@ def bookings(request):
         qs = broker.bookings.select_related('plot', 'plot__project', 'customer')
         return Response(BookingSerializer(qs, many=True).data)
 
+    # Validate the plot exists before running the full serializer so we can
+    # return a precise 409 when it is already reserved.
+    plot_id = request.data.get('plot')
+    plot = Plot.objects.filter(pk=plot_id).first()
+    if plot is None:
+        return Response({'detail': 'Plot not found.'}, status=status.HTTP_404_NOT_FOUND)
+    if plot.status != Plot.STATUS_AVAILABLE:
+        return Response({'detail': 'That plot is no longer available.'},
+                        status=status.HTTP_409_CONFLICT)
+    if Booking.objects.filter(plot=plot, status=Booking.STATUS_PENDING).exists():
+        return Response({'detail': 'That plot already has a pending booking.'},
+                        status=status.HTTP_409_CONFLICT)
+
     serializer = BookingSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
 
-    with transaction.atomic():
-        plot = Plot.objects.select_for_update().get(pk=serializer.validated_data['plot'].pk)
-        if plot.status != Plot.STATUS_AVAILABLE:
-            return Response({'detail': 'That plot is no longer available.'},
+    try:
+        with transaction.atomic():
+            plot = Plot.objects.select_for_update().get(pk=serializer.validated_data['plot'].pk)
+            if plot.status != Plot.STATUS_AVAILABLE:
+                return Response({'detail': 'That plot is no longer available.'},
+                                status=status.HTTP_409_CONFLICT)
+            booking = serializer.save(broker=broker, status=Booking.STATUS_PENDING)
+            plot.status = Plot.STATUS_ON_HOLD
+            plot.save(update_fields=['status'])
+    except Exception as exc:  # noqa: BLE001 - surface the DB constraint as a 409
+        if 'uniq_open_booking_per_plot' in str(exc) or 'unique' in str(exc).lower():
+            return Response({'detail': 'That plot already has a pending booking.'},
                             status=status.HTTP_409_CONFLICT)
-
-        booking = serializer.save(broker=broker, status=Booking.STATUS_PENDING)
-        plot.status = Plot.STATUS_ON_HOLD
-        plot.save(update_fields=['status'])
+        raise
 
     push_plot_update(plot, plot.status)
     notifications.notify(
