@@ -41,3 +41,7 @@ src/backend/.venv/
 # Playwright / test artefacts
 .playwright-mcp/
 test-results/
+
+# Local environment
+src/backend/.env
+src/frontend/.env.local
