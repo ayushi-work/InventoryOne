@@ -158,3 +158,23 @@ export const createBooking = (
   token: string,
   payload: { customer: number; plot: number; token_amount: number; payment_mode: string }
 ) => api<Booking>("/api/bookings/", { method: "POST", body: payload, token });
+
+// ===== Commissions =====
+export type Commission = {
+  id: number;
+  booking: number;
+  broker_id: number;
+  broker_name: string;
+  customer_name: string;
+  plot_label: string;
+  project_name: string;
+  amount: string;
+  tds_pct: string;
+  tds_amount: string;
+  net_amount: string;
+  released: boolean;
+  released_at: string | null;
+  created_at: string;
+};
+
+export const fetchCommissions = (token: string) => api<Commission[]>("/api/commissions/", { token });
