@@ -198,3 +198,153 @@ class Commission(models.Model):
 
     def __str__(self):
         return f'{self.broker} × {self.amount}'
+
+
+class CompanyProfile(models.Model):
+    """Singleton row holding company details and the relationship manager."""
+
+    name = models.CharField(max_length=200, default='InventoryOne Realty')
+    support_email = models.EmailField(default='support@inventoryone.local')
+    support_phone = models.CharField(max_length=20, default='+91 80 4000 1000')
+    rm_name = models.CharField(max_length=120, default='Relationship Manager')
+    rm_phone = models.CharField(max_length=20, default='+91 98800 11223')
+    rm_email = models.EmailField(default='manager@inventoryone.local')
+
+    class Meta:
+        verbose_name_plural = 'Company profile'
+
+    def __str__(self):
+        return self.name
+
+    @classmethod
+    def load(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+
+class Document(models.Model):
+    """A stored file: broker KYC uploads, price lists, forms, demand letters."""
+
+    KYC_PAN = 'kyc_pan'
+    KYC_AADHAAR = 'kyc_aadhaar'
+    KYC_GST = 'kyc_gst'
+    KYC_CANCELLED_CHEQUE = 'kyc_cancelled_cheque'
+    PRICE_LIST = 'price_list'
+    FORM = 'form'
+    DEMAND_LETTER = 'demand_letter'
+    KIND_CHOICES = [
+        (KYC_PAN, 'PAN card'),
+        (KYC_AADHAAR, 'Aadhaar card'),
+        (KYC_GST, 'GST certificate'),
+        (KYC_CANCELLED_CHEQUE, 'Cancelled cheque'),
+        (PRICE_LIST, 'Price list'),
+        (FORM, 'Form'),
+        (DEMAND_LETTER, 'Demand letter'),
+    ]
+    KYC_KINDS = [KYC_PAN, KYC_AADHAAR, KYC_GST, KYC_CANCELLED_CHEQUE]
+
+    broker = models.ForeignKey(Broker, on_delete=models.CASCADE, related_name='documents',
+                                null=True, blank=True)
+    booking = models.ForeignKey(Booking, on_delete=models.CASCADE, related_name='documents',
+                                 null=True, blank=True)
+    kind = models.CharField(max_length=30, choices=KIND_CHOICES)
+    title = models.CharField(max_length=200)
+    file = models.FileField(upload_to='documents/%Y/%m/')
+    content_type = models.CharField(max_length=120, blank=True)
+    size_bytes = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return self.title
+
+    @property
+    def is_kyc(self):
+        return self.kind in self.KYC_KINDS
+
+
+class Notification(models.Model):
+    KIND_PROJECT = 'project'
+    KIND_SCHEME = 'scheme'
+    KIND_BOOKING = 'booking'
+    KIND_COMMISSION = 'commission'
+    KIND_SYSTEM = 'system'
+    KIND_CHOICES = [
+        (KIND_PROJECT, 'New project'),
+        (KIND_SCHEME, 'Scheme'),
+        (KIND_BOOKING, 'Booking update'),
+        (KIND_COMMISSION, 'Commission'),
+        (KIND_SYSTEM, 'System'),
+    ]
+
+    broker = models.ForeignKey(Broker, on_delete=models.CASCADE, related_name='notifications')
+    title = models.CharField(max_length=200)
+    body = models.TextField(blank=True)
+    kind = models.CharField(max_length=20, choices=KIND_CHOICES, default=KIND_SYSTEM)
+    link = models.CharField(max_length=300, blank=True)
+    read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [models.Index(fields=['broker', 'read'])]
+
+    def __str__(self):
+        return self.title
+
+
+class SupportTicket(models.Model):
+    STATUS_OPEN = 'open'
+    STATUS_IN_PROGRESS = 'in_progress'
+    STATUS_RESOLVED = 'resolved'
+    STATUS_CHOICES = [
+        (STATUS_OPEN, 'Open'),
+        (STATUS_IN_PROGRESS, 'In progress'),
+        (STATUS_RESOLVED, 'Resolved'),
+    ]
+    PRIORITY_LOW = 'low'
+    PRIORITY_NORMAL = 'normal'
+    PRIORITY_HIGH = 'high'
+    PRIORITY_CHOICES = [
+        (PRIORITY_LOW, 'Low'),
+        (PRIORITY_NORMAL, 'Normal'),
+        (PRIORITY_HIGH, 'High'),
+    ]
+
+    broker = models.ForeignKey(Broker, on_delete=models.CASCADE, related_name='tickets')
+    subject = models.CharField(max_length=200)
+    message = models.TextField()
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_OPEN)
+    priority = models.CharField(max_length=10, choices=PRIORITY_CHOICES, default=PRIORITY_NORMAL)
+    response = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    resolved_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.subject} ({self.status})'
+
+
+class AuditLog(models.Model):
+    """Traceability record for approvals, releases and inventory changes (NFR-10)."""
+
+    actor = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True,
+                               related_name='audit_entries')
+    actor_name = models.CharField(max_length=150, blank=True)
+    action = models.CharField(max_length=60)
+    entity_type = models.CharField(max_length=60, blank=True)
+    entity_id = models.CharField(max_length=60, blank=True)
+    details = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [models.Index(fields=['entity_type', 'entity_id'])]
+
+    def __str__(self):
+        return f'{self.action} by {self.actor_name or "system"}'
