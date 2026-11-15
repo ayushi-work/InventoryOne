@@ -123,3 +123,60 @@ class Plot(models.Model):
 
     def __str__(self):
         return f'{self.project.code}-{self.plot_number}'
+
+
+class Customer(models.Model):
+    broker = models.ForeignKey(Broker, on_delete=models.CASCADE, related_name='customers')
+    name = models.CharField(max_length=200)
+    email = models.EmailField(blank=True)
+    phone = models.CharField(max_length=15)
+    address = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return self.name
+
+
+class Booking(models.Model):
+    STATUS_PENDING = 'pending'
+    STATUS_APPROVED = 'approved'
+    STATUS_REJECTED = 'rejected'
+    STATUS_CHOICES = [
+        (STATUS_PENDING, 'Pending'),
+        (STATUS_APPROVED, 'Approved'),
+        (STATUS_REJECTED, 'Rejected'),
+    ]
+
+    PAYMENT_MODES = [
+        ('upi', 'UPI'),
+        ('bank', 'Bank Transfer'),
+        ('cheque', 'Cheque'),
+        ('cash', 'Cash'),
+    ]
+
+    broker = models.ForeignKey(Broker, on_delete=models.CASCADE, related_name='bookings')
+    customer = models.ForeignKey(Customer, on_delete=models.PROTECT, related_name='bookings')
+    plot = models.ForeignKey(Plot, on_delete=models.PROTECT, related_name='bookings')
+    token_amount = models.DecimalField(max_digits=12, decimal_places=2)
+    payment_mode = models.CharField(max_length=10, choices=PAYMENT_MODES, default='upi')
+    commission_pct = models.DecimalField(max_digits=5, decimal_places=2, default=2)
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES,
+                              default=STATUS_PENDING, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    decided_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['plot'],
+                condition=models.Q(status='pending'),
+                name='uniq_open_booking_per_plot',
+            ),
+        ]
+
+    def __str__(self):
+        return f'{self.plot} / {self.customer} / {self.status}'

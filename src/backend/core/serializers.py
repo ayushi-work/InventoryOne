@@ -2,7 +2,9 @@
 from rest_framework import serializers
 
 from .models import (
+    Booking,
     Broker,
+    Customer,
     Plot,
     Project,
 )
@@ -56,3 +58,32 @@ class BrokerSerializer(serializers.ModelSerializer):
                   'aadhaar_number', 'gst_number', 'rera_number', 'bank_account',
                   'ifsc', 'agreement_accepted', 'created_at']
         read_only_fields = ['id', 'email', 'name', 'kyc_status', 'created_at']
+
+
+class CustomerSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Customer
+        fields = ['id', 'name', 'email', 'phone', 'address', 'created_at']
+        read_only_fields = ['id', 'created_at']
+
+
+class BookingSerializer(serializers.ModelSerializer):
+    broker = serializers.PrimaryKeyRelatedField(read_only=True)
+    broker_name = serializers.CharField(source='broker.user.first_name', read_only=True)
+    customer_name = serializers.CharField(source='customer.name', read_only=True)
+    customer = serializers.PrimaryKeyRelatedField(queryset=Customer.objects.all())
+    plot_details = PlotSerializer(source='plot', read_only=True)
+    commission = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Booking
+        fields = ['id', 'broker', 'broker_name', 'customer', 'customer_name',
+                  'plot', 'plot_details', 'token_amount', 'payment_mode',
+                  'commission_pct', 'status', 'created_at', 'decided_at', 'commission']
+        read_only_fields = ['broker', 'status', 'created_at', 'decided_at']
+
+    def get_commission(self, obj):
+        try:
+            return obj.commission.net_amount
+        except Commission.DoesNotExist:
+            return None

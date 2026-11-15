@@ -13,13 +13,17 @@ from rest_framework.permissions import AllowAny, IsAdminUser
 from rest_framework.response import Response
 
 from .models import (
+    Booking,
     Broker,
+    Customer,
     OTPCode,
     Plot,
     Project,
 )
 from .serializers import (
+    BookingSerializer,
     BrokerSerializer,
+    CustomerSerializer,
     ProjectDetailSerializer,
     ProjectListSerializer,
 )
@@ -130,5 +134,48 @@ def project_detail(request, pk):
         return Response({'detail': 'Project not found.'}, status=status.HTTP_404_NOT_FOUND)
     project = annotated_projects().filter(pk=project.pk).first()
     return Response(ProjectDetailSerializer(project).data)
+
+
+# ---------------------------------------------------------------------------
+# Customers
+# ---------------------------------------------------------------------------
+
+@api_view(['GET', 'POST'])
+def customers(request):
+    broker = get_broker(request)
+    if request.method == 'GET':
+        return Response(CustomerSerializer(broker.customers.all(), many=True).data)
+
+    serializer = CustomerSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    serializer.save(broker=broker)
+    return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+# ---------------------------------------------------------------------------
+# Bookings
+# ---------------------------------------------------------------------------
+
+@api_view(['GET', 'POST'])
+def bookings(request):
+    broker = get_broker(request)
+    if request.method == 'GET':
+        qs = broker.bookings.select_related('plot', 'plot__project', 'customer')
+        return Response(BookingSerializer(qs, many=True).data)
+
+    serializer = BookingSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+
+    with transaction.atomic():
+        plot = Plot.objects.select_for_update().get(pk=serializer.validated_data['plot'].pk)
+        if plot.status != Plot.STATUS_AVAILABLE:
+            return Response({'detail': 'That plot is no longer available.'},
+                            status=status.HTTP_409_CONFLICT)
+
+        booking = serializer.save(broker=broker, status=Booking.STATUS_PENDING)
+        plot.status = Plot.STATUS_ON_HOLD
+        plot.save(update_fields=['status'])
+
+    return Response(BookingSerializer(booking).data, status=status.HTTP_201_CREATED)
 
 

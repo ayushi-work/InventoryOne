@@ -8,4 +8,6 @@ urlpatterns = [
     path('api/me/', views.me, name='me'),
     path('api/projects/', views.project_list, name='project_list'),
     path('api/projects/<int:pk>/', views.project_detail, name='project_detail'),
+    path('api/customers/', views.customers, name='customers'),
+    path('api/bookings/', views.bookings, name='bookings'),
 ]
