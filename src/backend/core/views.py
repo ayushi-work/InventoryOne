@@ -9,7 +9,7 @@ from django.http import FileResponse, HttpResponse
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.authtoken.models import Token
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import AllowAny, IsAdminUser
 from rest_framework.response import Response
@@ -45,6 +45,7 @@ from .serializers import (
     SupportTicketSerializer,
 )
 from .services import audit, documents, notifications
+from .throttles import OTPBurstThrottle
 
 TDS_PCT = Decimal(10)
 
@@ -85,8 +86,30 @@ def push_plot_update(plot, status_value):
 # Authentication (OTP)
 # ---------------------------------------------------------------------------
 
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def health(request):
+    """Liveness / readiness probe used by Docker, Render and CI."""
+    from django.db import connection
+
+    db_ok = True
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute('SELECT 1')
+            cursor.fetchone()
+    except Exception:
+        db_ok = False
+
+    return Response({
+        'status': 'ok' if db_ok else 'degraded',
+        'database': 'up' if db_ok else 'down',
+        'projects': Project.objects.count() if db_ok else None,
+    }, status=status.HTTP_200_OK if db_ok else status.HTTP_503_SERVICE_UNAVAILABLE)
+
+
 @api_view(['POST'])
 @permission_classes([AllowAny])
+@throttle_classes([OTPBurstThrottle])
 def request_otp(request):
     email = (request.data.get('email') or '').strip().lower()
     if not email:
@@ -113,6 +136,7 @@ def request_otp(request):
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
+@throttle_classes([OTPBurstThrottle])
 def verify_otp(request):
     email = (request.data.get('email') or '').strip().lower()
     code = (request.data.get('code') or '').strip()
