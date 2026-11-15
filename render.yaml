@@ -1,0 +1,90 @@
+services:
+  - type: web
+    name: inventoryone-backend
+    runtime: docker
+    dockerfilePath: ./src/backend/Dockerfile
+    dockerContext: ./src/backend
+    plan: starter
+    healthCheckPath: /api/health/
+    envVars:
+      - key: DJANGO_DEBUG
+        value: "false"
+      - key: DJANGO_SECRET_KEY
+        sync: false
+      - key: DJANGO_ALLOWED_HOSTS
+        value: ".onrender.com"
+      - key: OTP_DEBUG_MODE
+        value: "false"
+      - key: POSTGRES_HOST
+        fromService:
+          type: web
+          name: inventoryone-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: inventoryone-redis
+          property: connectionString
+      - key: AWS_STORAGE_BUCKET_NAME
+        sync: false
+      - key: FCM_SERVER_KEY
+        sync: false
+      - key: GOOGLE_MAPS_API_KEY
+        sync: false
+    disk:
+      name: media
+      mountPath: /app/media
+      sizeGB: 1
+
+  - type: web
+    name: inventoryone-frontend
+    runtime: docker
+    dockerfilePath: ./src/frontend/Dockerfile
+    dockerContext: ./src/frontend
+    plan: starter
+    healthCheckPath: /
+    envVars:
+      - key: NEXT_PUBLIC_API_URL
+        fromService:
+          type: web
+          name: inventoryone-backend
+          property: host
+      - key: NEXT_PUBLIC_WS_URL
+        fromService:
+          type: web
+          name: inventoryone-backend
+          property: host
+
+  - type: worker
+    name: inventoryone-worker
+    runtime: docker
+    dockerfilePath: ./src/backend/Dockerfile
+    dockerContext: ./src/backend
+    plan: starter
+    dockerCommand: celery -A inventoryone worker -l info
+    envVars:
+      - key: DJANGO_DEBUG
+        value: "false"
+      - key: DJANGO_SECRET_KEY
+        sync: false
+      - key: POSTGRES_HOST
+        fromService:
+          type: web
+          name: inventoryone-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: inventoryone-redis
+          property: connectionString
+
+  - type: db
+    name: inventoryone-db
+    databaseName: inventoryone
+    user: inventoryone
+    plan: starter
+
+  - type: redis
+    name: inventoryone-redis
+    plan: starter
+    ipAllowList: []
