@@ -166,16 +166,14 @@ def bookings(request):
     serializer = BookingSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
 
-    with transaction.atomic():
-        plot = Plot.objects.select_for_update().get(pk=serializer.validated_data['plot'].pk)
-        if plot.status != Plot.STATUS_AVAILABLE:
-            return Response({'detail': 'That plot is no longer available.'},
-                            status=status.HTTP_409_CONFLICT)
+    plot = Plot.objects.select_for_update().get(pk=serializer.validated_data['plot'].pk)
+    if plot.status != Plot.STATUS_AVAILABLE:
+        return Response({'detail': 'That plot is no longer available.'},
+                        status=status.HTTP_409_CONFLICT)
 
-        booking = serializer.save(broker=broker, status=Booking.STATUS_PENDING)
-        plot.status = Plot.STATUS_ON_HOLD
-        plot.save(update_fields=['status'])
-
+    booking = serializer.save(broker=broker, status=Booking.STATUS_PENDING)
+    plot.status = Plot.STATUS_ON_HOLD
+    plot.save(update_fields=['status'])
     return Response(BookingSerializer(booking).data, status=status.HTTP_201_CREATED)
 
 
