@@ -1,8 +1,8 @@
-# InventoryOne — Broker Web App
+# InventoryOne: Broker Web App
 
 ## Project Description
 
-The **InventoryOne — Broker Web App** is a real-estate platform that allows registered brokers to register and log in via OTP with KYC verification, view active projects with live colour-coded plot availability, view plot details, register customers, raise booking requests, track commissions, download documents, and stay updated via notifications.
+The **InventoryOne: Broker Web App** is a real-estate platform that allows registered brokers to register and log in via OTP with KYC verification, view active projects with live colour-coded plot availability, view plot details, register customers, raise booking requests, track commissions, download documents, and stay updated via notifications.
 
 Company administrators can manage projects, plot inventory, and broker bookings, and approve or reject booking requests.
 
@@ -68,6 +68,97 @@ InventoryOne/
 | `src/backend/`  | Backend source code and APIs        |
 | `test/`         | Test cases and testing code         |
 | `.gitignore`    | Files excluded from version control |
+
+### Documentation Index
+
+| Document                       | Experiment | Contents                                    |
+| ------------------------------ | ---------- | ------------------------------------------- |
+| `docs/feasibility-analysis.md` | 2          | Problem identification and feasibility     |
+| `docs/SRS/srs.md`              | 4          | Software Requirements Specification        |
+| `docs/UML/use-case.md`         | 5          | Use case diagram and use case narratives    |
+| `docs/design-analysis.md`      | 8          | Software design principles analysis        |
+| `docs/presentation/`           | —          | Student presentation deck (PPTX + Markdown) |
+
+---
+
+# Running the Application
+
+## Prerequisites
+
+- Python 3.11 – 3.13
+- Node.js 20+
+- PostgreSQL 14+
+
+## 1. Backend (Django + DRF)
+
+```bash
+cd src/backend
+
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+
+# Create the database (once)
+createdb inventoryone
+
+# Apply migrations and load demo data
+python manage.py migrate
+python manage.py seed_demo
+
+# Start the API on http://127.0.0.1:8000
+python manage.py runserver
+```
+
+## 2. Frontend (Next.js)
+
+```bash
+cd src/frontend
+
+npm install
+npm run dev      # http://127.0.0.1:3000
+```
+
+The frontend talks to the API at `http://127.0.0.1:8000` by default. Override it with
+`NEXT_PUBLIC_API_URL` if the API runs elsewhere.
+
+## Demo Logins
+
+| Role                   | Email                    | Notes                                   |
+| ---------------------- | ------------------------ | --------------------------------------- |
+| Broker                 | `broker@example.com`     | Sign in with OTP (dev code is shown)    |
+| Broker (KYC pending)   | `priya.broker@example.com` | Sign in with OTP                      |
+| Company Administrator  | `admin@inventoryone.local` | Sign in with OTP; Django Admin password `admin123` |
+
+In development the OTP is returned directly by `POST /api/auth/request-otp/` because e-mail
+delivery is stubbed. Set `OTP_DEBUG_MODE = False` in `settings.py` for production.
+
+## 3. Tests
+
+```bash
+cd src/backend
+python manage.py test core
+```
+
+## API Overview
+
+| Method | Endpoint                            | Purpose                              |
+| ------ | ----------------------------------- | ------------------------------------ |
+| POST   | `/api/auth/request-otp/`            | Send an OTP to an e-mail             |
+| POST   | `/api/auth/verify-otp/`             | Verify OTP and receive an auth token |
+| GET    | `/api/me/`                          | Broker profile and KYC status         |
+| PATCH  | `/api/me/`                          | Update KYC and bank details          |
+| GET    | `/api/projects/`                    | Active projects with availability    |
+| GET    | `/api/projects/<id>/`               | Project detail with plot inventory   |
+| GET    | `/api/customers/`                   | Customers registered by the broker   |
+| POST   | `/api/customers/`                   | Register a customer                  |
+| GET    | `/api/bookings/`                    | Bookings raised by the broker        |
+| POST   | `/api/bookings/`                    | Raise a booking request              |
+| GET    | `/api/commissions/`                 | Commission ledger for the broker     |
+| GET    | `/api/admin/stats/`                 | Company dashboard statistics         |
+| GET    | `/api/admin/bookings/`              | All booking requests                 |
+| POST   | `/api/admin/bookings/<id>/decide/`  | Approve or reject a booking          |
+| GET    | `/api/admin/commissions/`           | All commissions                      |
+| POST   | `/api/admin/commissions/<id>/release/` | Release a commission              |
 
 ---
 
