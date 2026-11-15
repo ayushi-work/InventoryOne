@@ -118,3 +118,43 @@ export const fetchMe = (token: string) => api<Broker>("/api/me/", { token });
 
 export const updateMe = (token: string, payload: Partial<Broker>) =>
   api<Broker>("/api/me/", { method: "PATCH", body: payload, token });
+
+// ===== Customers =====
+export type Customer = {
+  id: number;
+  name: string;
+  email: string;
+  phone: string;
+  address: string;
+  created_at: string;
+};
+
+export const fetchCustomers = (token: string) => api<Customer[]>("/api/customers/", { token });
+
+export const createCustomer = (token: string, payload: Partial<Customer>) =>
+  api<Customer>("/api/customers/", { method: "POST", body: payload, token });
+
+// ===== Bookings =====
+export type Booking = {
+  id: number;
+  broker: number;
+  broker_name: string;
+  customer: number;
+  customer_name: string;
+  plot: number;
+  plot_details: Plot;
+  token_amount: string;
+  payment_mode: string;
+  commission_pct: string;
+  status: "pending" | "approved" | "rejected";
+  created_at: string;
+  decided_at: string | null;
+  commission: number | null;
+};
+
+export const fetchBookings = (token: string) => api<Booking[]>("/api/bookings/", { token });
+
+export const createBooking = (
+  token: string,
+  payload: { customer: number; plot: number; token_amount: number; payment_mode: string }
+) => api<Booking>("/api/bookings/", { method: "POST", body: payload, token });
