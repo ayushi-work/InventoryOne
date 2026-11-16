@@ -77,10 +77,11 @@ InventoryOne/
 | `docs/SRS/srs.md`              | 4          | Software Requirements Specification        |
 | `docs/UML/use-case.md`         | 5          | Use case diagram and use case narratives    |
 | `docs/design-analysis.md`      | 8          | Software design principles analysis        |
-| `docs/UML/er-diagram.md`       | —          | Entity relationship diagram                 |
-| `docs/UML/class-diagram.md`    | —          | Class diagram                              |
-| `docs/UML/sequence-diagram.md` | —          | Sequence diagrams for the core workflows   |
-| `docs/UML/activity-diagram.md` | —          | Activity diagrams                          |
+| `docs/UML/er-diagram.md`           | —          | Entity relationship diagram                 |
+| `docs/UML/class-diagram.md`        | 6          | Class diagram (classes, attributes, operations) |
+| `docs/UML/sequence-and-activity.md` | 7         | Sequence and activity diagrams              |
+| `docs/UML/sequence-diagram.md`     | —          | Sequence diagrams for the core workflows    |
+| `docs/UML/activity-diagram.md`     | —          | Activity diagrams                          |
 | `docs/presentation/`           | —          | Student presentation deck (PPTX + Markdown) |
 | `test/test-cases.md`           | —          | Manual test cases and exit criteria        |
 | `test/api_smoke.py`            | —          | End-to-end API smoke test                  |
