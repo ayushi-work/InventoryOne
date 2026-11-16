@@ -82,6 +82,7 @@ InventoryOne/
 | `docs/UML/sequence-and-activity.md` | 7         | Sequence and activity diagrams              |
 | `docs/UML/sequence-diagram.md`     | —          | Sequence diagrams for the core workflows    |
 | `docs/UML/activity-diagram.md`     | —          | Activity diagrams                          |
+| `docs/UML/architecture-and-state.md` | 9        | Software architecture and UML state diagrams |
 | `docs/presentation/`           | —          | Student presentation deck (PPTX + Markdown) |
 | `test/test-cases.md`           | —          | Manual test cases and exit criteria        |
 | `test/api_smoke.py`            | —          | End-to-end API smoke test                  |
